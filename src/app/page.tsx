@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import Image from 'next/image'
 import { Bookmark, Chrome, Zap, Shield, Users } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -35,12 +36,18 @@ export default function Home() {
         {/* Header */}
         <div className="text-center mb-16">
           <div className="flex justify-center mb-6">
-            <div className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-xl">
-              <Bookmark className="w-12 h-12 text-white" />
+            <div className="relative w-32 h-32 transition-transform hover:scale-110 duration-300">
+              <Image
+                src="/OnYourMark/logo.png"
+                alt="OnYourMark Logo"
+                fill
+                className="object-contain drop-shadow-2xl"
+                priority
+              />
             </div>
           </div>
           <h1 className="text-5xl font-bold text-gray-900 mb-4">
-            Smart Bookmarks
+            OnYourMark
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Your personal, secure, and real-time bookmark manager. Save, organize, and access your favorite links from anywhere.
@@ -122,7 +129,7 @@ export default function Home() {
                 Ready to get started?
               </h2>
               <p className="text-gray-600 mb-6">
-                Join thousands of users who trust Smart Bookmarks to keep their favorite links organized and accessible.
+                Join thousands of users who trust OnYourMark to keep their favorite links organized and accessible.
               </p>
               <Button
                 onClick={signInWithGoogle}

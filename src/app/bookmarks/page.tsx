@@ -61,7 +61,7 @@ export default function BookmarksPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       <Header />
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-4 pt-32 pb-8">
         {notification && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-center">
             {notification}
