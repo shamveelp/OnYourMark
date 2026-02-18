@@ -41,3 +41,8 @@ CREATE POLICY "Users can manage their own bookmarks"
 -- Add indexes for better performance
 CREATE INDEX IF NOT EXISTS bookmarks_user_id_idx ON bookmarks(user_id);
 CREATE INDEX IF NOT EXISTS bookmarks_created_at_idx ON bookmarks(created_at DESC);
+
+-- Enable real-time for the bookmarks table
+-- This allows Supabase to broadcast changes to the client
+-- Note: This is required for the real-time subscriptions in useBookmarks.ts to work
+ALTER PUBLICATION supabase_realtime ADD TABLE bookmarks;

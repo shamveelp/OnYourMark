@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase, Bookmark } from '@/lib/supabase'
 import { useAuth } from './useAuth'
 
@@ -9,6 +9,7 @@ export function useBookmarks() {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const fetchBookmarks = useCallback(async () => {
     if (!user) {
@@ -40,8 +41,13 @@ export function useBookmarks() {
     if (!user) return
 
     // Set up real-time subscription
-    const subscription = supabase
-      .channel('bookmarks_changes')
+    const channel = supabase.channel('bookmarks_changes', {
+      config: {
+        broadcast: { self: false }, // Don't send broadcast to self, we update local state manually
+      },
+    })
+
+    channel
       .on(
         'postgres_changes',
         {
@@ -52,27 +58,69 @@ export function useBookmarks() {
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setBookmarks((prev) => [payload.new as Bookmark, ...prev])
+            const newBookmark = payload.new as Bookmark
+            setBookmarks((prev) => {
+              if (prev.some((b) => b.id === newBookmark.id)) return prev
+              return [newBookmark, ...prev]
+            })
           } else if (payload.eventType === 'DELETE') {
             setBookmarks((prev) => prev.filter((b) => b.id !== payload.old.id))
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedBookmark = payload.new as Bookmark
+            setBookmarks((prev) =>
+              prev.map((b) => (b.id === updatedBookmark.id ? updatedBookmark : b))
+            )
           }
         }
       )
+      // Add broadcast for instant tab-to-tab sync
+      .on('broadcast', { event: 'sync' }, ({ payload }) => {
+        if (payload.type === 'INSERT') {
+          setBookmarks((prev) => {
+            if (prev.some((b) => b.id === payload.data.id)) return prev
+            return [payload.data, ...prev]
+          })
+        } else if (payload.type === 'DELETE') {
+          setBookmarks((prev) => prev.filter((b) => b.id !== payload.id))
+        }
+      })
       .subscribe()
 
+    channelRef.current = channel
+
     return () => {
-      subscription.unsubscribe()
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null // Clear the ref after removal
+      }
     }
   }, [user])
 
   const addBookmark = async (url: string, title: string) => {
     if (!user) throw new Error('User not authenticated')
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('bookmarks')
       .insert([{ url, title, user_id: user.id }])
+      .select()
+      .single()
 
     if (error) throw error
+
+    if (data) {
+      const newBookmark = data as Bookmark
+      setBookmarks((prev) => {
+        if (prev.some((b) => b.id === newBookmark.id)) return prev
+        return [newBookmark, ...prev]
+      })
+
+      // Broadcast to other tabs immediately
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'sync',
+        payload: { type: 'INSERT', data: newBookmark },
+      })
+    }
   }
 
   const deleteBookmark = async (id: string) => {
@@ -82,6 +130,15 @@ export function useBookmarks() {
       .eq('id', id)
 
     if (error) throw error
+
+    setBookmarks((prev) => prev.filter((b) => b.id !== id))
+
+    // Broadcast to other tabs immediately
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'sync',
+      payload: { type: 'DELETE', id },
+    })
   }
 
   return {
